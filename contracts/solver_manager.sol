@@ -188,7 +188,7 @@ constructor() {
  return false;
  }
  
- // Check if solver has liquidity on TICS (chainId = 9030)
+ // Check if solver has liquidity on TICS (chainId = 9029)
  if (solverChainAmounts[solverId][REQUIRED_CHAIN_TICS] == 0) {
  return false;
  }
