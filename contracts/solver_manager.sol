@@ -40,7 +40,6 @@ contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeab
  mapping(string => uint256) private solverTotalAmounts; 
  mapping(string => mapping(uint256 => uint256)) private solverChainAmounts; 
  mapping(string => LiquidityDeposit[]) private solverDeposits;
- mapping(string => bool) private authorizedAddresses;
  mapping(string => address) private solverEvmAddress;
  mapping(string => mapping(uint256 => uint256)) private solverChainRewards;
  mapping(string => uint256) private solverTotalRewards;
@@ -171,10 +170,6 @@ constructor() {
  _;
  }
 
- modifier onlyAuthorizedAddress(string memory solverAddress) {
- if (!authorizedAddresses[solverAddress]) revert UnauthorizedCaller();
- _;
- }
 
  modifier validAmount(uint256 amount) {
  if (amount == 0) revert InvalidAmount();
@@ -285,7 +280,6 @@ constructor() {
  // Update mappings for all addresses
  for (uint256 i = 0; i < solverAddresses.length; i++) {
  addressToSolverId[solverAddresses[i]] = solverId;
- authorizedAddresses[solverAddresses[i]] = true;
  }
  
  // Update state
