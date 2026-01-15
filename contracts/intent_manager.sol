@@ -18,7 +18,8 @@ contract IntentManager is
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant MPC_ROLE = keccak256("MPC_ROLE");
-
+    // Reserve storage slots for future upgrades
+    uint256[47] private __gap;
 
     // Enum to represent phases of an intent
     enum IntentPhase {

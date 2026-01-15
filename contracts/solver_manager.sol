@@ -300,43 +300,6 @@ constructor() {
 
  
  /**
- * @dev Offboard all active solvers (DEFAULT_ADMIN_ROLE only)
- */
- function removeAllSolvers() external
- // onlyRole(DEFAULT_ADMIN_ROLE) 
- {
-
- // Loop through all active solvers
- uint256 length = activeSolverIds.length;
-
- for (uint256 i = 0; i < length; i++) {
- string memory solverId = activeSolverIds[i];
-
- // Ensure solver exists & is onboarded
- if (solverExists[solverId] && solvers[solverId].isOnboarded) {
-
- // Mark inactive and offboarded
- solvers[solverId].isActive = false;
- solvers[solverId].isOnboarded = false;
- solvers[solverId].offboardedAt = block.timestamp;
-
- // Emit event
- emit SolverOffboarded(
- solverId,
- solvers[solverId].solverAddresses,
- block.timestamp
- );
- }
- }
-
- // Clear all active solver IDs
- delete activeSolverIds;
-
- // Reset counter
- totalActiveSolvers = 0;
- }
-
- /**
  * @dev Add liquidity by solver for specific chain
  * @param solverId Solver's unique identifier
  * @param chainId Chain ID where liquidity is added
@@ -350,6 +313,7 @@ constructor() {
  external 
  onlyOnboardedSolver(solverId)
  validAmount(amount)
+onlyRole(MPC_ROLE)
  {
 
  // Update chain-specific amounts
