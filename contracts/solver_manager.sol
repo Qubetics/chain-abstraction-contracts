@@ -48,12 +48,15 @@ contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeab
 // Minimum liquidity thresholds for required chains (enforced in activation logic)
 uint256 private minLiquidityBTC;
 uint256 private minLiquidityTICS;
+
+// Flag to track if privileged roles have been permanently renounced
+bool private rolesRenounced;
  
- string[] private activeSolverIds;
- uint256 private totalActiveSolvers;
+string[] private activeSolverIds;
+uint256 private totalActiveSolvers;
  
- // Reserve storage slots for future upgrades
- uint256[47] private __gap;
+// Reserve storage slots for future upgrades
+uint256[46] private __gap;
  
  // Events
  event SolverOnboarded(
@@ -105,12 +108,17 @@ uint256 private minLiquidityTICS;
 
  event ContractUpgraded(address indexed newImplementation, uint256 timestamp);
 
- event MinimumLiquidityUpdated(
- uint256 chainId,
- uint256 oldMinimum,
- uint256 newMinimum,
- uint256 timestamp
- );
+event MinimumLiquidityUpdated(
+    uint256 chainId,
+    uint256 oldMinimum,
+    uint256 newMinimum,
+    uint256 timestamp
+);
+
+event RolesPermanentlyRenounced(
+    address indexed renouncer,
+    uint256 timestamp
+);
 
  // Custom errors
  error SolverAlreadyExists(string solverId);
@@ -129,6 +137,8 @@ uint256 private minLiquidityTICS;
 error AddressAlreadyAssigned(string addr);
 error UnauthorizedCaller();
 error AddressAlreadyOnboarded(address addr);
+error RolesAlreadyRenounced();
+error UpgradeDisabled();
 
 constructor() {
     _disableInitializers();
@@ -151,12 +161,77 @@ constructor() {
  minLiquidityTICS = 10 * 10**18; // 10 TICS (with 18 decimals) 
  }
 
- /**
+/**
  * @dev Required by UUPSUpgradeable - only UPGRADER_ROLE can authorize upgrades
+ * Reverts if roles have been permanently renounced
  */
- function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {
- emit ContractUpgraded(newImplementation, block.timestamp);
- }
+function _authorizeUpgrade(address newImplementation) internal override {
+    if (rolesRenounced) revert UpgradeDisabled();
+    if (!hasRole(UPGRADER_ROLE, msg.sender)) {
+        revert UnauthorizedCaller();
+    }
+    emit ContractUpgraded(newImplementation, block.timestamp);
+}
+
+/**
+ * @dev Permanently renounce all privileged roles (DEFAULT_ADMIN_ROLE, ADMIN_ROLE, UPGRADER_ROLE)
+ * This function can only be called once and cannot be reversed
+ * After calling this, the contract can never be upgraded or have admin roles reassigned
+ * @notice This is a one-way operation - once called, privileged roles can never be reclaimed
+ */
+function renouncePrivilegedRoles() external {
+    if (rolesRenounced) revert RolesAlreadyRenounced();
+    
+    // Check if caller has at least one of the privileged roles
+    bool hasPrivilegedRole = hasRole(DEFAULT_ADMIN_ROLE, msg.sender) ||
+                             hasRole(ADMIN_ROLE, msg.sender) ||
+                             hasRole(UPGRADER_ROLE, msg.sender);
+    
+    if (!hasPrivilegedRole) {
+        revert UnauthorizedCaller();
+    }
+    
+    // Renounce all privileged roles from the caller
+    if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
+    if (hasRole(ADMIN_ROLE, msg.sender)) {
+        _revokeRole(ADMIN_ROLE, msg.sender);
+    }
+    if (hasRole(UPGRADER_ROLE, msg.sender)) {
+        _revokeRole(UPGRADER_ROLE, msg.sender);
+    }
+    
+    // Set the flag to prevent any future role assignments
+    rolesRenounced = true;
+    
+    emit RolesPermanentlyRenounced(msg.sender, block.timestamp);
+}
+
+/**
+ * @dev Check if privileged roles have been permanently renounced
+ * @return bool True if roles have been renounced
+ */
+function areRolesRenounced() external view returns (bool) {
+    return rolesRenounced;
+}
+
+/**
+ * @dev Override grantRole to prevent granting privileged roles after renouncement
+ * @param role The role to grant
+ * @param account The account to grant the role to
+ */
+function grantRole(bytes32 role, address account) public override {
+    if (rolesRenounced) {
+        // Prevent granting any privileged roles after renouncement
+        if (role == DEFAULT_ADMIN_ROLE || 
+            role == ADMIN_ROLE || 
+            role == UPGRADER_ROLE) {
+            revert RolesAlreadyRenounced();
+        }
+    }
+    super.grantRole(role, account);
+}
 
  // Modifiers
  modifier onlyOnboardedSolver(string memory solverId) {

@@ -20,6 +20,7 @@ contract IntentManager is
     bytes32 public constant MPC_ROLE = keccak256("MPC_ROLE");
     // Reserve storage slots for future upgrades
     uint256[47] private __gap;
+bool private rolesRenounced;
 
     // Enum to represent phases of an intent
     enum IntentPhase {
@@ -101,6 +102,12 @@ contract IntentManager is
     event SolverAdded(address indexed solver);
     event SolverRemoved(address indexed solver);
 
+event RolesPermanentlyRenounced(
+    address indexed renouncer,
+    uint256 timestamp
+);
+
+
     // Custom errors
     error NoneValue();
     error ExceedsLimit();
@@ -108,6 +115,10 @@ contract IntentManager is
     error InvalidPhaseTransition();
     error IntentAlreadyExists();
     error ZeroAddress();
+    error RolesAlreadyRenounced();
+    error UnauthorizedCaller();
+
+
 
     // Modifiers
     modifier validAmount(uint128 amount) {
@@ -205,10 +216,66 @@ contract IntentManager is
             TransactionStatus.Pending
         );
     }
-
-    constructor() {
-     _disableInitializers();
+    
+    /**
+ * @dev Permanently renounce all privileged roles (DEFAULT_ADMIN_ROLE, ADMIN_ROLE, UPGRADER_ROLE)
+ * This function can only be called once and cannot be reversed
+ * After calling this, the contract can never be upgraded or have admin roles reassigned
+ * @notice This is a one-way operation - once called, privileged roles can never be reclaimed
+ */
+function renouncePrivilegedRoles() external {
+    if (rolesRenounced) revert RolesAlreadyRenounced();
+    
+    // Check if caller has at least one of the privileged roles
+    bool hasPrivilegedRole = hasRole(DEFAULT_ADMIN_ROLE, msg.sender) ||
+                             hasRole(ADMIN_ROLE, msg.sender) ||
+                             hasRole(UPGRADER_ROLE, msg.sender);
+    
+    if (!hasPrivilegedRole) {
+        revert UnauthorizedCaller();
     }
+    
+    // Renounce all privileged roles from the caller
+    if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
+    if (hasRole(ADMIN_ROLE, msg.sender)) {
+        _revokeRole(ADMIN_ROLE, msg.sender);
+    }
+    if (hasRole(UPGRADER_ROLE, msg.sender)) {
+        _revokeRole(UPGRADER_ROLE, msg.sender);
+    }
+    
+    // Set the flag to prevent any future role assignments
+    rolesRenounced = true;
+    
+    emit RolesPermanentlyRenounced(msg.sender, block.timestamp);
+}
+
+/**
+ * @dev Check if privileged roles have been permanently renounced
+ * @return bool True if roles have been renounced
+ */
+function areRolesRenounced() external view returns (bool) {
+    return rolesRenounced;
+}
+
+/**
+ * @dev Override grantRole to prevent granting privileged roles after renouncement
+ * @param role The role to grant
+ * @param account The account to grant the role to
+ */
+function grantRole(bytes32 role, address account) public override {
+    if (rolesRenounced) {
+        // Prevent granting any privileged roles after renouncement
+        if (role == DEFAULT_ADMIN_ROLE || 
+            role == ADMIN_ROLE || 
+            role == UPGRADER_ROLE) {
+            revert RolesAlreadyRenounced();
+        }
+    }
+    super.grantRole(role, account);
+}
 
     /**
      * @notice Fulfill an intent
