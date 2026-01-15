@@ -45,9 +45,9 @@ contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeab
  mapping(string => uint256) private solverTotalRewards;
  mapping(address => string) private solverAccount;
 
- // Minimum liquidity thresholds for required chains (stored but not enforced yet)
- uint256 private minLiquidityBTC;
- uint256 private minLiquidityTICS;
+// Minimum liquidity thresholds for required chains (enforced in activation logic)
+uint256 private minLiquidityBTC;
+uint256 private minLiquidityTICS;
  
  string[] private activeSolverIds;
  uint256 private totalActiveSolvers;
@@ -177,25 +177,25 @@ constructor() {
  _;
  }
 
- /**
+/**
  * @dev Check if solver meets required chain liquidity conditions
- * NOTE: Currently checks for > 0, NOT against minimum thresholds
+ * Enforces minimum liquidity thresholds for BTC and TICS chains
  * @param solverId Solver's unique identifier
- * @return bool True if solver has liquidity on all required chains
+ * @return bool True if solver has sufficient liquidity on all required chains
  */
- function _meetsRequiredChainLiquidity(string memory solverId) internal view returns (bool) {
- // Check if solver has liquidity on BTC (chainId = 0)
- if (solverChainAmounts[solverId][REQUIRED_CHAIN_BTC] == 0) {
- return false;
- }
- 
- // Check if solver has liquidity on TICS (chainId = 9029)
- if (solverChainAmounts[solverId][REQUIRED_CHAIN_TICS] == 0) {
- return false;
- }
- 
- return true;
- }
+function _meetsRequiredChainLiquidity(string memory solverId) internal view returns (bool) {
+    // Check if solver has minimum required liquidity on BTC (chainId = 0)
+    if (solverChainAmounts[solverId][REQUIRED_CHAIN_BTC] < minLiquidityBTC) {
+        return false;
+    }
+    
+    // Check if solver has minimum required liquidity on TICS (chainId = 9029)
+    if (solverChainAmounts[solverId][REQUIRED_CHAIN_TICS] < minLiquidityTICS) {
+        return false;
+    }
+    
+    return true;
+}
 
  /**
  * @dev Check if both required chains have zero liquidity
@@ -664,7 +664,7 @@ onlyRole(MPC_ROLE)
 
  /**
  * @dev Set minimum liquidity for BTC chain (ADMIN_ROLE only)
- * NOTE: Currently stored but NOT enforced in activation logic
+ * NOTE: This threshold is enforced in the solver activation logic
  * @param newMinimum New minimum liquidity threshold for BTC
  */
  function setMinimumLiquidityBTC(uint256 newMinimum) 
@@ -678,7 +678,7 @@ onlyRole(MPC_ROLE)
 
  /**
  * @dev Set minimum liquidity for TICS chain (ADMIN_ROLE only)
- * NOTE: Currently stored but NOT enforced in activation logic
+ * NOTE: This threshold is enforced in the solver activation logic
  * @param newMinimum New minimum liquidity threshold for TICS
  */
  function setMinimumLiquidityTICS(uint256 newMinimum) 
