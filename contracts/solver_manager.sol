@@ -254,6 +254,7 @@ constructor() {
  if (solverExists[solverId]) revert SolverAlreadyExists(solverId);
  if (chainIds.length == 0) revert EmptyChainIdsList();
  if (solverAddresses.length == 0) revert EmptyAddressList();
+ require(bytes(solverId).length != 0, "Solver ID cannot be empty");
 
  solverEvmAddress[solverId] = msg.sender;
  
