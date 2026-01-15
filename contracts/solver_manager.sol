@@ -130,6 +130,10 @@ contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeab
  error AddressAlreadyAssigned(string addr);
  error UnauthorizedCaller();
 
+constructor() {
+    _disableInitializers();
+}
+
  /**
  * @dev Initializer function (replaces constructor for upgradeable contracts)
  */

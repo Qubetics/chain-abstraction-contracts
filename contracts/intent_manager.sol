@@ -205,6 +205,10 @@ contract IntentManager is
         );
     }
 
+    constructor() {
+     _disableInitializers();
+    }
+
     /**
      * @notice Fulfill an intent
      */
