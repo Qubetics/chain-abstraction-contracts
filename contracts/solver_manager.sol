@@ -126,8 +126,9 @@ contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeab
  error EmptyChainIdsList();
  error EmptyAmountsList();
  error ArrayLengthMismatch();
- error AddressAlreadyAssigned(string addr);
- error UnauthorizedCaller();
+error AddressAlreadyAssigned(string addr);
+error UnauthorizedCaller();
+error AddressAlreadyOnboarded(address addr);
 
 constructor() {
     _disableInitializers();
@@ -243,18 +244,22 @@ constructor() {
  * @param chainIds Array of chain IDs where solver operates
  * @param solverAddresses Array of string addresses belonging to the solver
  */
- function onboardSolver(
- string memory solverId,
- string memory solverName,
- uint256[] memory chainIds,
- string[] memory solverAddresses
- ) 
- external
- {
- if (solverExists[solverId]) revert SolverAlreadyExists(solverId);
- if (chainIds.length == 0) revert EmptyChainIdsList();
- if (solverAddresses.length == 0) revert EmptyAddressList();
- require(bytes(solverId).length != 0, "Solver ID cannot be empty");
+function onboardSolver(
+    string memory solverId,
+    string memory solverName,
+    uint256[] memory chainIds,
+    string[] memory solverAddresses
+) 
+external
+{
+    // Ensure each EVM address can only onboard once
+    if (bytes(solverAccount[msg.sender]).length != 0) {
+        revert AddressAlreadyOnboarded(msg.sender);
+    }
+    if (solverExists[solverId]) revert SolverAlreadyExists(solverId);
+    if (chainIds.length == 0) revert EmptyChainIdsList();
+    if (solverAddresses.length == 0) revert EmptyAddressList();
+    require(bytes(solverId).length != 0, "Solver ID cannot be empty");
 
  solverEvmAddress[solverId] = msg.sender;
  
