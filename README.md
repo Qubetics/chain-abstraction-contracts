@@ -43,30 +43,6 @@ The contracts use `AccessControlUpgradeable` and `UUPSUpgradeable` from OpenZepp
 
 ---
 
-## Security Hardening (QCA-03 and Related)
-
-- **Minimum Liquidity Enforcement**
-  - `minLiquidityBTC = 600` satoshi and `minLiquidityTICS = 10 * 10**18` (10 TICS) are **actively enforced**.
-  - `_meetsRequiredChainLiquidity` checks that solver liquidity on required chains is **at least** the configured minimums, not just non‑zero.
-  - Solver activation logic uses this function so that solvers cannot activate with insufficient liquidity.
-
-- **One-Time Onboarding Per EVM Address**
-  - `onboardSolver` checks `solverAccount[msg.sender]` and reverts if the caller has already onboarded.
-  - This prevents the same EVM address from onboarding multiple solver identities.
-
-- **Centralized Control of Upgrades (QCA-03)**
-  - `solver_manager.sol` includes:
-    - `rolesRenounced` flag (stored on chain).
-    - `renouncePrivilegedRoles()` which:
-      - Can be called once by an address holding any privileged role (`DEFAULT_ADMIN_ROLE`, `ADMIN_ROLE`, `UPGRADER_ROLE`).
-      - Revokes all privileged roles from the caller.
-      - Sets `rolesRenounced = true`.
-      - Emits `RolesPermanentlyRenounced(renouncer, timestamp)`.
-    - `_authorizeUpgrade` reverts with `UpgradeDisabled()` when `rolesRenounced` is `true`, permanently disabling upgrades.
-    - `grantRole` and `_grantRole` are overridden so that, once `rolesRenounced` is `true`, no privileged roles (`DEFAULT_ADMIN_ROLE`, `ADMIN_ROLE`, `UPGRADER_ROLE`) can ever be granted again.
-  - **Effect**: After `renouncePrivilegedRoles()` is called, upgrade and privileged admin control are irreversibly disabled, addressing centralized‑upgrade risk.
-
----
 
 ## Development Setup
 
