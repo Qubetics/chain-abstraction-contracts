@@ -15,9 +15,9 @@ interface ITreasuryVault {
 
 contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeable, EIP712Upgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant MPC_ROLE = keccak256("MPC_ROLE"); //goes to liquidity operator and shefi address.
+    bytes32 public constant MPC_ROLE = keccak256("MPC_ROLE"); 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE"); 
-    bytes32 public constant INTENT_MANAGER_ROLE = keccak256("INTENT_MANAGER_ROLE"); //give that role to intent_manager contract
+    bytes32 public constant INTENT_MANAGER_ROLE = keccak256("INTENT_MANAGER_ROLE"); 
 
     // Required chains for solver activation
     uint256 public constant REQUIRED_CHAIN_BTC = 0;
@@ -100,8 +100,6 @@ contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeab
     mapping(string => mapping(uint256 => uint256)) private solverRewards;
 
     // Reward percentage constants
-    uint256 public constant VALIDATED_REWARD_PERCENTAGE = 100; // 100% for validated solvers
-    uint256 public constant NON_VALIDATED_REWARD_PERCENTAGE = 75; // 75% for non-validated solvers
     uint256 public constant PERCENTAGE_DIVISOR = 100;
     uint256 public solverFeePercentage;
 
@@ -119,8 +117,7 @@ contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeab
     mapping(address => uint256) private onboardNonces;
     mapping(address => uint256) private validateNonces;
 
-    // Platform fee tracking (the remaining 2.5% protocol fee)
-    uint256 public platformFeePercentage; // basis points, e.g. 250 = 2.5%
+    uint256 public platformFeePercentage;
     // chainId => accrued platform fee
     mapping(uint256 => uint256) private platformFeeAccrued;
     // chainId => claimed platform fee
@@ -291,7 +288,7 @@ contract SolverManager is Initializable, AccessControlUpgradeable, UUPSUpgradeab
             return false;
         }
         
-        // Check if solver has minimum required liquidity on TICS (chainId = 9029)
+        // Check if solver has minimum required liquidity on TICS (chainId = 9030)
         if (solverChainAmounts[solverId][REQUIRED_CHAIN_TICS] < minLiquidityTICS) {
             return false;
         }
@@ -621,7 +618,6 @@ function removeLiquidity(
 )
     external
     onlyRole(MPC_ROLE) 
-
 {
     if (requests.length == 0) revert EmptyAmountsList();
 
@@ -695,58 +691,77 @@ function removeLiquidity(
      * @dev Calculate solvers reward based on liquidity and validation status.
      *      Decimals: no conversion. Amounts must be in smallest unit per chain.
      *      - BTC (chain 0): intentSourceAmount and liquidity in satoshis.
-     *      - TICS (chain 9029): intentSourceAmount and liquidity in wei (18 decimals).
-     * @param sourceChainId Source chain ID (0 = BTC, 9029 = TICS)
-     * @param targetChainId Target chain ID (0 = BTC, 9029 = TICS)
+     *      - TICS (chain 9030): intentSourceAmount and liquidity in wei (18 decimals).
+     * @param sourceChainId Source chain ID (0 = BTC, 9030 = TICS)
+     * @param targetChainId Target chain ID (0 = BTC, 9030 = TICS)
      * @param intentSourceAmount Total reward to distribute (same unit as source chain: satoshis for BTC, wei for TICS)
      */
     function solverRewardUpdation(
-        uint256 sourceChainId,
-        uint256 targetChainId,
-        uint256 intentSourceAmount
-    )
-        external
-        onlyRole(INTENT_MANAGER_ROLE) 
-    {
-        if (intentSourceAmount == 0) revert InvalidAmount();
+    uint256 sourceChainId,
+    uint256 targetChainId,
+    uint256 intentSourceAmount
+)
+    external
+    onlyRole(INTENT_MANAGER_ROLE)
 
-        // Calculate total liquidity on target chain
-        uint256 totalTargetChainLiquidity = 0;
-        for (uint256 i = 0; i < activeSolverIds.length; i++) {
-            string memory solverId = activeSolverIds[i];
-            if (solvers[solverId].isActive) {
-                totalTargetChainLiquidity += solverChainAmounts[solverId][targetChainId];
-            }
-        }
+{
+    if (intentSourceAmount == 0) revert InvalidAmount();
 
-        for (uint256 i = 0; i < activeSolverIds.length; i++) {
-            string memory solverId = activeSolverIds[i];
+    uint256 totalLiquidity = 0;
+    uint256 totalValidatedLiquidity = 0;
 
-            if (!solvers[solverId].isActive) continue;
+    // Calculate total liquidity and total validated liquidity
+    for (uint256 i = 0; i < activeSolverIds.length; i++) {
+        string memory solverId = activeSolverIds[i];
 
-            uint256 solverLiquidity = solverChainAmounts[solverId][targetChainId];
-            if (solverLiquidity == 0) continue;
+        if (!solvers[solverId].isActive) continue;
 
-            uint256 weightedReward =
-                (solverLiquidity * intentSourceAmount) / totalTargetChainLiquidity;
+        uint256 liquidity = solverChainAmounts[solverId][targetChainId];
+        if (liquidity == 0) continue;
 
-            address solverAddr = solverEvmAddress[solverId];
+        totalLiquidity += liquidity;
 
-            uint256 finalReward = solverIdValidated[solverAddr]
-                ? weightedReward
-                : (weightedReward * NON_VALIDATED_REWARD_PERCENTAGE) / PERCENTAGE_DIVISOR;
-
-            solverRewards[solverId][sourceChainId] += finalReward;
+        address solverAddr = solverEvmAddress[solverId];
+        if (solverIdValidated[solverAddr]) {
+            totalValidatedLiquidity += liquidity;
         }
     }
 
+    if (totalLiquidity == 0) return;
+
+    uint256 basePool = (intentSourceAmount * 75) / PERCENTAGE_DIVISOR;
+    uint256 bonusPool = (intentSourceAmount * 25) / PERCENTAGE_DIVISOR;
+
+    for (uint256 i = 0; i < activeSolverIds.length; i++) {
+        string memory solverId = activeSolverIds[i];
+
+        if (!solvers[solverId].isActive) continue;
+
+        uint256 liquidity = solverChainAmounts[solverId][targetChainId];
+        if (liquidity == 0) continue;
+
+        address solverAddr = solverEvmAddress[solverId];
+
+        uint256 reward = 0;
+
+        // 75% distributed to all active solvers
+        reward += (liquidity * basePool * 100) / totalLiquidity;
+
+        // 25% distributed only to validated solvers
+        if (solverIdValidated[solverAddr] && totalValidatedLiquidity > 0) {
+            reward += (liquidity * bonusPool * 100) / totalValidatedLiquidity;
+        }
+
+        solverRewards[solverId][sourceChainId] += reward;
+    }
+}
     /**
      * @dev Accrue platform fee from intent processing.
      *      Called by IntentManager alongside solverRewardUpdation.
      *      Decimals: no conversion. Amounts must be in smallest unit per chain.
-     *      - BTC (chain 0): feeAmount in satoshis.
-     *      - TICS (chain 9029): feeAmount in wei (18 decimals).
-     * @param sourceChainId Source chain ID (0 = BTC, 9029 = TICS)
+     *      - BTC : feeAmount in satoshis.
+     *      - TICS : feeAmount in wei (18 decimals).
+     * @param sourceChainId Source chain ID (0 = BTC, 9030 = TICS)
      * @param feeAmount Fee amount to accrue (same unit as source chain)
      */
     function platformFeeUpdation(
@@ -891,6 +906,7 @@ function removeLiquidity(
 
     function setMinimumLiquidityBTC(uint256 newMinimum) 
         external 
+        onlyRole(ADMIN_ROLE)
     {
         uint256 oldMinimum = minLiquidityBTC;
         minLiquidityBTC = newMinimum;
@@ -951,9 +967,9 @@ function removeLiquidity(
         return onboardNonces[account];
     }
 
-    /**
-     * @dev Get current validation nonce for validator (used when signing validateSolverId)
-     */
+    // /**
+    //  * @dev Get current validation nonce for validator (used when signing validateSolverId)
+    //  */
     function getValidateNonce(address account) external view returns (uint256) {
         return validateNonces[account];
     }
