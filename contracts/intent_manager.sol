@@ -96,6 +96,7 @@ contract IntentManager is
     address public treasuryVault;
     // Solver Address
     address public solverManager;
+    bool public gmvReached;
 
     // Events
     event IntentInsight(
@@ -249,23 +250,32 @@ contract IntentManager is
                 targetChainId = 9030;
             }
 
-
-        uint256 feePercentage = ISolverManager(solverManager)
+        uint256 solverFee = ISolverManager(solverManager)
         .getSolverFeePercentage();
-        // Reward in same unit as input.sourceAmount: wei for TICS, satoshis for BTC (no decimal conversion)
-        ISolverManager(solverManager).solverRewardUpdation(
-            sourceChainId,
-            targetChainId,
-            (input.sourceAmount * feePercentage) / 10000
-        );
 
-        // Platform/protocol fee (remaining 2.5%)
         uint256 platformFee = ISolverManager(solverManager)
         .getPlatformFeePercentage();
-        ISolverManager(solverManager).platformFeeUpdation(
-            sourceChainId,
-            (input.sourceAmount * platformFee) / 10000
-        );
+
+        if (gmvReached) {
+            ISolverManager(solverManager).solverRewardUpdation(
+                sourceChainId,
+                targetChainId,
+                (input.sourceAmount * solverFee) / 10000
+            );
+
+            ISolverManager(solverManager).platformFeeUpdation(
+                sourceChainId,
+                (input.sourceAmount * platformFee) / 10000
+            );
+        } else {
+            uint256 totalFee = solverFee + platformFee;
+
+            ISolverManager(solverManager).solverRewardUpdation(
+                sourceChainId,
+                targetChainId,
+                (input.sourceAmount * totalFee) / 10000
+            );
+        }
 
         // For TICS batch, prepare data for vault transfer
         if (batchType == BatchType.TICS) {
@@ -302,6 +312,13 @@ contract IntentManager is
     {
         if (_solverManager == address(0)) revert ZeroAddress();
         solverManager = _solverManager;
+    }
+
+    function setGmvReached(bool _status)
+    external
+    onlyRole(ADMIN_ROLE)
+    {
+        gmvReached = _status;
     }
 
 
@@ -348,7 +365,7 @@ contract IntentManager is
 
     /**
      * @notice Returns true if token is TICS (case-insensitive: "TICS", "tics", "Tics")
-     *         So rewards and chain id use TICS (9029) even when intent was stored with lowercase "tics"
+     *         So rewards and chain id use TICS (9030) even when intent was stored with lowercase "tics"
      */
     function _isTicsToken(string memory token) internal pure returns (bool) {
         bytes32 h = keccak256(bytes(token));
