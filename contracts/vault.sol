@@ -30,6 +30,9 @@ contract TreasuryVault is
         _disableInitializers();
     }
 
+    // Reserve storage slots for future upgrades
+    uint256[35] private __gap;
+
     /**
      * @dev Initialize the contract (replaces constructor for upgradeable contracts)
      */

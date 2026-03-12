@@ -98,6 +98,9 @@ contract IntentManager is
     address public solverManager;
     bool public gmvReached;
 
+    // Reserve storage slots for future upgrades
+    uint256[35] private __gap;
+
     // Events
     event IntentInsight(
         string sourceAddress,
