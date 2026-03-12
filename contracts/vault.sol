@@ -177,7 +177,6 @@ contract TreasuryVault is
         return address(this).balance;
     }
 
-    function deposit(uint256 amount) external payable {}
 
     /**
      * @dev Get implementation version
