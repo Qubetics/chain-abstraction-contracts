@@ -509,6 +509,7 @@ contract SolverManager is
             !solverOnboarded[msg.sender],
             "solver with this evm address already onboarded"
         );
+        if (solverExists[solverId]) revert SolverAlreadyExists(solverId);
 
         // Verify EIP-712 signature
         bool isValidSignature = _verifyOnboardSignature(
