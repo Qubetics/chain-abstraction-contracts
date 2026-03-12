@@ -31,14 +31,18 @@ contract SolverManager is
     uint256 public constant REQUIRED_CHAIN_TICS = 9030;
 
     // EIP-712 Type Hash for Solver Onboarding
+    // Includes the solver's intended EVM address to prevent front-running /
+    // solver hijacking by binding the signature to a specific msg.sender.
     bytes32 public constant ONBOARD_SOLVER_TYPEHASH =
         keccak256(
-            "OnboardSolver(string solverId,string solverName,uint256[] chainIds,string[] solverAddresses,uint256 nonce,uint256 deadline)"
+            "OnboardSolver(string solverId,string solverName,uint256[] chainIds,string[] solverAddresses,address solverEvmAddress,uint256 nonce,uint256 deadline)"
         );
 
+    // Includes the solver's EVM address to ensure the same account that
+    // onboarded is the one validating the ID.
     bytes32 public constant VALIDATE_SOLVER_TYPEHASH =
         keccak256(
-            "ValidateSolver(string solverId,uint256 nonce,uint256 deadline)"
+            "ValidateSolver(string solverId,address solverEvmAddress,uint256 nonce,uint256 deadline)"
         );
 
     enum ChainType {
@@ -404,6 +408,7 @@ contract SolverManager is
      */
     function _verifyOnboardSignature(
         address signer,
+        address solverEvmAddress,
         string memory solverId,
         string memory solverName,
         uint256[] memory chainIds,
@@ -418,6 +423,7 @@ contract SolverManager is
         bytes32 structHash = keccak256(
             abi.encode(
                 ONBOARD_SOLVER_TYPEHASH,
+                solverEvmAddress,
                 keccak256(bytes(solverId)),
                 keccak256(bytes(solverName)),
                 _hashUint256Array(chainIds),
@@ -435,6 +441,7 @@ contract SolverManager is
 
     function _verifyValidateSolverSignature(
         address signer,
+        address solverEvmAddress,
         string memory solverId,
         uint256 nonce,
         uint256 deadline,
@@ -446,6 +453,7 @@ contract SolverManager is
         bytes32 structHash = keccak256(
             abi.encode(
                 VALIDATE_SOLVER_TYPEHASH,
+                solverEvmAddress,
                 keccak256(bytes(solverId)),
                 nonce,
                 deadline
@@ -500,6 +508,7 @@ contract SolverManager is
         // Verify EIP-712 signature
         bool isValidSignature = _verifyOnboardSignature(
             validatorAddress,
+            msg.sender,
             solverId,
             solverName,
             chainIds,
@@ -564,6 +573,7 @@ contract SolverManager is
 
         bool valid = _verifyValidateSolverSignature(
             validatorAddress,
+            msg.sender,
             solverId,
             validateNonces[validatorAddress],
             deadline,
