@@ -509,6 +509,7 @@ contract SolverManager is
             !solverOnboarded[msg.sender],
             "solver with this evm address already onboarded"
         );
+        require(bytes(solverId).length > 0, "Solver ID cannot be empty");
         if (solverExists[solverId]) revert SolverAlreadyExists(solverId);
 
         // Verify EIP-712 signature
