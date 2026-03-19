@@ -976,7 +976,7 @@ contract SolverManager is
     function setSolverFeePercentage(
         uint256 newFee
     ) external onlyRole(ADMIN_ROLE) {
-        require(newFee <= 10000, "Solver fee percentage cannot be greater than 100%");
+        require(newFee <= 5000, "Solver fee percentage cannot be greater than 100%");
         require(newFee >= 0, "Solver fee percentage cannot be less than 0");
         uint256 oldFee = solverFeePercentage;
         solverFeePercentage = newFee;
@@ -991,7 +991,7 @@ contract SolverManager is
     function setPlatformFeePercentage(
         uint256 newFee
     ) external onlyRole(ADMIN_ROLE) {
-        require(newFee <= 10000, "Platform fee percentage cannot be greater than 100%");
+        require(newFee <= 5000, "Platform fee percentage cannot be greater than 100%");
         require(newFee >= 0, "Platform fee percentage cannot be less than 0");
         uint256 oldFee = platformFeePercentage;
         platformFeePercentage = newFee;
