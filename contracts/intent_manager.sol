@@ -253,31 +253,43 @@ contract IntentManager is
                 targetChainId = 9030;
             }
 
-        uint256 solverFee = ISolverManager(solverManager)
-        .getSolverFeePercentage();
+        uint256 solverFee = ISolverManager(solverManager).getSolverFeePercentage();
 
         uint256 platformFee = ISolverManager(solverManager)
-        .getPlatformFeePercentage();
+            .getPlatformFeePercentage();
 
+        // Guard against zero-fee (or rounding-to-zero) updates.
+        // SolverManager reverts on zero amount, which would otherwise revert the whole batch.
         if (gmvReached) {
-            ISolverManager(solverManager).solverRewardUpdation(
-                sourceChainId,
-                targetChainId,
-                (input.sourceAmount * solverFee) / 10000
-            );
+            uint256 solverRewardAmount = (uint256(input.sourceAmount) * solverFee) /
+                10000;
+            if (solverRewardAmount > 0) {
+                ISolverManager(solverManager).solverRewardUpdation(
+                    sourceChainId,
+                    targetChainId,
+                    solverRewardAmount
+                );
+            }
 
-            ISolverManager(solverManager).platformFeeUpdation(
-                sourceChainId,
-                (input.sourceAmount * platformFee) / 10000
-            );
+            uint256 platformFeeAmount = (uint256(input.sourceAmount) *
+                platformFee) / 10000;
+            if (platformFeeAmount > 0) {
+                ISolverManager(solverManager).platformFeeUpdation(
+                    sourceChainId,
+                    platformFeeAmount
+                );
+            }
         } else {
             uint256 totalFee = solverFee + platformFee;
-
-            ISolverManager(solverManager).solverRewardUpdation(
-                sourceChainId,
-                targetChainId,
-                (input.sourceAmount * totalFee) / 10000
-            );
+            uint256 solverRewardAmount = (uint256(input.sourceAmount) * totalFee) /
+                10000;
+            if (solverRewardAmount > 0) {
+                ISolverManager(solverManager).solverRewardUpdation(
+                    sourceChainId,
+                    targetChainId,
+                    solverRewardAmount
+                );
+            }
         }
 
         // For TICS batch, prepare data for vault transfer
